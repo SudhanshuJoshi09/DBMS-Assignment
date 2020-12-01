@@ -12,7 +12,10 @@ import schedule
 from datetime import datetime
 from selenium.webdriver.common.action_chains import ActionChains
 import discord_webhook
+from flask import Flask
+from flask import render_template, request, redirect, url_for
 
+app = Flask(__name__)
 opt = Options()
 opt.add_argument("--disable-infobars")
 opt.add_argument("start-maximized")
@@ -79,48 +82,59 @@ def validate_day(inp):
 		return False
 
 
-def add_timetable():
-	if(not(path.exists("timetable.db"))):
-			createDB()
-	op = int(input("1. Add class\n2. Done adding\nEnter option : "))
-	while(op==1):
-		name = input("Enter class name : ")
-		start_time = input("Enter class start time in 24 hour format: (HH:MM) ")
-		while not(validate_input("\d\d:\d\d",start_time)):
-			print("Invalid input, try again")
-			start_time = input("Enter class start time in 24 hour format: (HH:MM) ")
-
-		end_time = input("Enter class end time in 24 hour format: (HH:MM) ")
-		while not(validate_input("\d\d:\d\d",end_time)):
-			print("Invalid input, try again")
-			end_time = input("Enter class end time in 24 hour format: (HH:MM) ")
-
-		day = input("Enter day (Monday/Tuesday/Wednesday..etc) : ")
-		while not(validate_day(day.strip())):
-			print("Invalid input, try again")
-			end_time = input("Enter day (Monday/Tuesday/Wednesday..etc) : ")
-
+@app.route('/add_class', methods=['GET', 'POST'])
+def add_class():
+	if request.method == 'POST':
+		class_name = request.form['class_name']
+		s_hours = request.form['s_hours']
+		s_mins = request.form['s_mins']
+		e_hours = request.form['e_hours']
+		e_mins = request.form['e_mins']
+		start_time = s_hours + ':' + s_mins
+		end_time = e_hours + ':' + e_mins
+		day = request.form['day']
 
 		conn = sqlite3.connect('timetable.db')
 		c=conn.cursor()
-
-		# Insert a row of data
-		c.execute("INSERT INTO timetable VALUES ('%s','%s','%s','%s')"%(name,start_time,end_time,day))
-
+		c.execute("INSERT INTO timetable VALUES ('%s','%s','%s','%s')"%(class_name, start_time, end_time, day))
 		conn.commit()
 		conn.close()
+		return redirect(url_for('add_timetable'))
 
-		print("Class added to database\n")
-
-		op = int(input("1. Add class\n2. Done adding\nEnter option : "))
+	return render_template('add_class.html')
 
 
+@app.route('/create_new', methods=['GET', 'POST'])
+def add_timetable():
+
+	if request.method == 'POST':
+		if(not(path.exists("timetable.db"))):
+			createDB()
+
+		try:
+			btn_type1 = request.form['Add']
+		except:
+			btn_type1 = None
+		try:
+			btn_type2 = request.form['End']
+		except:
+			btn_type2 = None
+
+		if btn_type1:
+			return render_template('end.html')
+		elif btn_type2:
+			return redirect(url_for('add_class'))
+	return render_template('new_req.html')
+
+@app.route('/show_timetable')
 def view_timetable():
 	conn = sqlite3.connect('timetable.db')
-	c=conn.cursor()
+	c = conn.cursor()
+	temp = []
 	for row in c.execute('SELECT * FROM timetable'):
-		print(row)
+		temp.append(row)
 	conn.close()
+	return render_template('show_table.html', val=temp)
 
 
 
@@ -256,14 +270,21 @@ def sched():
 		schedule.run_pending()
 		time.sleep(1)
 
+@app.route('/')
+def checking():
+	return render_template('base.html')
+
 
 if __name__=="__main__":
 	# joinclass("Maths","15:13","15:15","sunday")
-	op = int(input(("1. Modify Timetable\n2. View Timetable\n3. Start Bot\nEnter option : ")))
+	#op = int(input(("1. Modify Timetable\n2. View Timetable\n3. Start Bot\nEnter option : ")))
 	
+	'''
 	if(op==1):
 		add_timetable()
 	if(op==2):
 		view_timetable()
 	if(op==3):
 		sched()
+	'''
+	app.run(debug=True)
