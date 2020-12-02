@@ -1,60 +1,54 @@
+# Flask Imports
+from flask import Flask
+from flask import render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+# The Selenium imports
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
+# Utility Imports
+from datetime import datetime
+from os import path
 import time
 import re
-import os.path
-from os import path
 import sqlite3
 import schedule
-from datetime import datetime
-from selenium.webdriver.common.action_chains import ActionChains
 import discord_webhook
-from flask import Flask
-from flask import render_template, request, redirect, url_for
+
 
 app = Flask(__name__)
-opt = Options()
-opt.add_argument("--disable-infobars")
-opt.add_argument("start-maximized")
-opt.add_argument("--disable-extensions")
-opt.add_argument("--start-maximized")
-# Pass the argument 1 to allow and 2 to block
-opt.add_experimental_option("prefs", { \
-    "profile.default_content_setting_values.media_stream_mic": 1, 
-    "profile.default_content_setting_values.media_stream_camera": 1,
-    "profile.default_content_setting_values.geolocation": 1, 
-    "profile.default_content_setting_values.notifications": 1 
-  })
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///students.sqlite3'
+
 
 # driver = webdriver.Chrome(chrome_options=opt,service_log_path='NUL')
-driver = None
-URL = "https://teams.microsoft.com"
-
 #put your teams credentials here
-CREDS = {'email' : '','passwd':''}
-
+DRIVER = None
+URL = "https://teams.microsoft.com"
+CREDS = {'email' : '','password':''}
 
 
 def login():
-	global driver
-	#login required
-	print("logging in")
-	emailField = driver.find_element_by_xpath('//*[@id="i0116"]')
-	emailField.click()
-	emailField.send_keys(CREDS['email'])
-	driver.find_element_by_xpath('//*[@id="idSIButton9"]').click() #Next button
+	""" function for logging into microsoft-teams """
+
+	global DRIVER
+	# print("logging in")
+	# Filling the email field
+	email_field = DRIVER.find_element_by_xpath('//*[@id="i0116"]')
+	email_field.click()
+	email_field.send_keys(CREDS['email'])
+
+	DRIVER.find_element_by_xpath('//*[@id="idSIButton9"]').click()
 	time.sleep(5)
-	passwordField = driver.find_element_by_xpath('//*[@id="i0118"]')
+	passwordField = DRIVER.find_element_by_xpath('//*[@id="i0118"]')
 	passwordField.click()
-	passwordField.send_keys(CREDS['passwd'])
-	driver.find_element_by_xpath('//*[@id="idSIButton9"]').click() #Sign in button
+	passwordField.send_keys(CREDS['password'])
+	DRIVER.find_element_by_xpath('//*[@id="idSIButton9"]').click() #Sign in button
 	time.sleep(5)
-	driver.find_element_by_xpath('//*[@id="idSIButton9"]').click() #remember login
+	DRIVER.find_element_by_xpath('//*[@id="idSIButton9"]').click() #remember login
 	time.sleep(5)
-	# return driver
 
 
 def createDB():
@@ -65,22 +59,6 @@ def createDB():
 	conn.commit()
 	conn.close()
 	print("Created timetable Database")
-
-
-
-def validate_input(regex,inp):
-	if not re.match(regex,inp):
-		return False
-	return True
-
-def validate_day(inp):
-	days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
-
-	if inp.lower() in days:
-		return True
-	else:
-		return False
-
 
 @app.route('/add_class', methods=['GET', 'POST'])
 def add_class():
@@ -139,7 +117,7 @@ def view_timetable():
 
 
 def joinclass(class_name,start_time,end_time):
-	global driver
+	global DRIVER
 
 	try_time = int(start_time.split(":")[1]) + 15
 	try_time = start_time.split(":")[0] + ":" + str(try_time)
@@ -147,7 +125,7 @@ def joinclass(class_name,start_time,end_time):
 	time.sleep(5)
 
 
-	classes_available = driver.find_elements_by_class_name("name-channel-type")
+	classes_available = DRIVER.find_elements_by_class_name("name-channel-type")
 
 	for i in classes_available:
 		if class_name.lower() in i.get_attribute('innerHTML').lower():
@@ -155,12 +133,9 @@ def joinclass(class_name,start_time,end_time):
 			i.click()
 			break
 
-
 	time.sleep(4)
-
-
 	try:
-		joinbtn = driver.find_element_by_class_name("ts-calling-join-button")
+		joinbtn = DRIVER.find_element_by_class_name("ts-calling-join-button")
 		joinbtn.click()
 
 	except:
@@ -170,7 +145,7 @@ def joinclass(class_name,start_time,end_time):
 		while(k<=15):
 			print("Join button not found, trying again")
 			time.sleep(60)
-			driver.refresh()
+			DRIVER.refresh()
 			joinclass(class_name,start_time,end_time)
 			# schedule.every(1).minutes.do(joinclass,class_name,start_time,end_time)
 			k+=1
@@ -179,17 +154,17 @@ def joinclass(class_name,start_time,end_time):
 
 
 	time.sleep(4)
-	webcam = driver.find_element_by_xpath('//*[@id="page-content-wrapper"]/div[1]/div/calling-pre-join-screen/div/div/div[2]/div[1]/div[2]/div/div/section/div[2]/toggle-button[1]/div/button/span[1]')
+	webcam = DRIVER.find_element_by_xpath('//*[@id="page-content-wrapper"]/div[1]/div/calling-pre-join-screen/div/div/div[2]/div[1]/div[2]/div/div/section/div[2]/toggle-button[1]/div/button/span[1]')
 	if(webcam.get_attribute('title')=='Turn camera off'):
 		webcam.click()
 	time.sleep(1)
 
-	microphone = driver.find_element_by_xpath('//*[@id="preJoinAudioButton"]/div/button/span[1]')
+	microphone = DRIVER.find_element_by_xpath('//*[@id="preJoinAudioButton"]/div/button/span[1]')
 	if(microphone.get_attribute('title')=='Mute microphone'):
 		microphone.click()
 
 	time.sleep(1)
-	joinnowbtn = driver.find_element_by_xpath('//*[@id="page-content-wrapper"]/div[1]/div/calling-pre-join-screen/div/div/div[2]/div[1]/div[2]/div/div/section/div[1]/div/div/button')
+	joinnowbtn = DRIVER.find_element_by_xpath('//*[@id="page-content-wrapper"]/div[1]/div/calling-pre-join-screen/div/div/div[2]/div[1]/div[2]/div/div/section/div[1]/div/div/button')
 	joinnowbtn.click()
 
 	discord_webhook.send_msg(class_name=class_name,status="joined",start_time=start_time,end_time=end_time)
@@ -201,32 +176,39 @@ def joinclass(class_name,start_time,end_time):
 
 	time.sleep(class_running_time.seconds)
 
-	driver.find_element_by_class_name("ts-calling-screen").click()
+	DRIVER.find_element_by_class_name("ts-calling-screen").click()
 
 
-	driver.find_element_by_xpath('//*[@id="teams-app-bar"]/ul/li[3]').click() #come back to homepage
+	DRIVER.find_element_by_xpath('//*[@id="teams-app-bar"]/ul/li[3]').click() #come back to homepage
 	time.sleep(1)
 
-	driver.find_element_by_xpath('//*[@id="hangup-button"]').click()
+	DRIVER.find_element_by_xpath('//*[@id="hangup-button"]').click()
 	print("Class left")
 	discord_webhook.send_msg(class_name=class_name,status="left",start_time=start_time,end_time=end_time)
 
-
-
-
-
 def start_browser():
+	""" for running the browser """
 
-	global driver
-	driver = webdriver.Chrome(chrome_options=opt,service_log_path='NUL')
+	global DRIVER
+	# Defining the default options of the web-driver
+	opt = Options()
+	opt.add_argument("--disable-infobars")
+	opt.add_argument("start-maximized")
+	opt.add_argument("--disable-extensions")
+	opt.add_argument("--start-maximized")
+	# Pass the argument 1 to allow and 2 to block
+	opt.add_experimental_option("prefs", { \
+		"profile.default_content_setting_values.media_stream_mic": 1, 
+		"profile.default_content_setting_values.media_stream_camera": 1,
+		"profile.default_content_setting_values.geolocation": 1, 
+		"profile.default_content_setting_values.notifications": 1 
+	})
+	DRIVER = webdriver.Chrome(chrome_options=opt,service_log_path='NUL')
+	DRIVER.get(URL)
 
-	driver.get(URL)
-
-	WebDriverWait(driver,10000).until(EC.visibility_of_element_located((By.TAG_NAME,'body')))
-
-	if("login.microsoftonline.com" in driver.current_url):
+	WebDriverWait(DRIVER,10000).until(EC.visibility_of_element_located((By.TAG_NAME,'body')))
+	if("login.microsoftonline.com" in DRIVER.current_url):
 		login()
-
 
 
 def sched():
@@ -242,26 +224,24 @@ def sched():
 		if day.lower()=="monday":
 			schedule.every().monday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="tuesday":
+		elif day.lower()=="tuesday":
 			schedule.every().tuesday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="wednesday":
+		elif day.lower()=="wednesday":
 			schedule.every().wednesday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="thursday":
+		elif day.lower()=="thursday":
 			schedule.every().thursday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="friday":
+		elif day.lower()=="friday":
 			schedule.every().friday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="saturday":
+		elif day.lower()=="saturday":
 			schedule.every().saturday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-		if day.lower()=="sunday":
+		elif day.lower()=="sunday":
 			schedule.every().sunday.at(start_time).do(joinclass,name,start_time,end_time)
 			print("Scheduled class '%s' on %s at %s"%(name,day,start_time))
-
-
 	#Start browser
 	start_browser()
 	while True:
@@ -270,21 +250,5 @@ def sched():
 		schedule.run_pending()
 		time.sleep(1)
 
-@app.route('/')
-def checking():
-	return render_template('base.html')
-
-
 if __name__=="__main__":
-	# joinclass("Maths","15:13","15:15","sunday")
-	#op = int(input(("1. Modify Timetable\n2. View Timetable\n3. Start Bot\nEnter option : ")))
-	
-	'''
-	if(op==1):
-		add_timetable()
-	if(op==2):
-		view_timetable()
-	if(op==3):
-		sched()
-	'''
 	app.run(debug=True)
