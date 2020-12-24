@@ -12,9 +12,13 @@ COPY ./requirements.txt /requirements.txt
 RUN pip3 install -r /requirements.txt
 
 # Setting Up directory Structure.
+# making app directory
 RUN mkdir /app
+# Change working directory
 WORKDIR /app
+# COPY SRC DST
 COPY ./app /app
 
+# Creating a new user.
 RUN adduser -D user
 USER user

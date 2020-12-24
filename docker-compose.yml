@@ -1,0 +1,16 @@
+# Here are the dependencies for the docker file 
+# This here tell's which version of docker-compose is being used.
+version: '3.8'
+
+services:
+  app:
+    build:
+     context: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+    command: >
+      sh -c "python3 manage.py migrate &&
+             python3 manage.py runserver 0.0.0.0:8000"
+    
